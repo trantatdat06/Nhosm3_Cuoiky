@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css" />
-    
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer> </script>
     <style>
         /* --- CẤU HÌNH CHUNG --- */
         :root { --primary-orange: #ff6b35; --primary-red: #d82b2b; --text-dark: #333; --bg-beige: #fff5e1; --box-bg: #fffbf5; }
@@ -49,12 +49,33 @@
         .pd-right { flex: 1.3; min-width: 300px; }
         .pd-name { font-size: 24px; font-weight: 800; color: #222; margin-bottom: 15px; line-height: 1.35; text-transform: uppercase; letter-spacing: 0.5px; }
 
+        /* --- CSS ZOOM ẢNH (LIGHTBOX) --- */
+        /* --- CSS ZOOM ẢNH (LIGHTBOX) - STYLE HIỆN ĐẠI --- */
+        .lightbox-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999999; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; cursor: zoom-out; backdrop-filter: blur(5px); }
+        .lightbox-overlay.active { opacity: 1; visibility: visible; }
+        .lightbox-img { max-width: 90%; max-height: 90%; object-fit: contain; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); border-radius: 4px; box-shadow: 0 5px 30px rgba(0,0,0,0.3); }
+        .lightbox-overlay.active .lightbox-img { transform: scale(1); }
+
+        /* ICON KÍNH LÚP (STYLE MỚI: TRÒN TRẮNG) */
+        .main-image-frame { position: relative; cursor: zoom-in; overflow: hidden; }
+        /* Tạo nút tròn trắng, đổ bóng, nằm góc phải */
+        .main-image-frame::after { content: '\f00e'; font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; bottom: 15px; right: 15px; width: 45px; height: 45px; background: #fff; color: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.15); font-size: 18px; pointer-events: none; opacity: 0; transform: translateY(10px); transition: all 0.3s ease; }
+        /* Khi di chuột vào ảnh thì nút mới trượt lên */
+        .main-image-frame:hover::after { opacity: 1; transform: translateY(0); }
+
+
         /* Group giá tiền */
         .pd-price-group { background: #fff5f5; padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; border: 1px dashed #ffcccc; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
         .price-new { font-size: 26px; font-weight: 800; color: var(--primary-red); margin-right: 5px; }
         .price-old { font-size: 15px; color: #999; text-decoration: line-through; }
         .stock-badge { background: #e6fffa; color: #00a884; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-left: auto; }
-
+        /* Style cho phần đánh giá tổng quan trên đầu */
+        .product-rating-overview { display: flex; align-items: center; gap: 8px; margin: 10px 0 20px 0; /* Cách trên dưới 1 chút */ font-size: 14px; }
+        .product-rating-overview .rating-stars { color: #ffc107; /* Màu vàng của sao */ font-size: 16px; }
+        .product-rating-overview .rating-number { font-weight: bold; color: var(--primary-orange); /* Lấy theo màu chủ đạo của bạn */ font-size: 16px; margin-top: 2px; }
+        .product-rating-overview .separator { color: #ccc; }
+        .product-rating-overview .scroll-link { color: #555; text-decoration: underline; cursor: pointer; transition: color 0.2s; }
+        .product-rating-overview .scroll-link:hover { color: var(--primary-orange); }
         /* Mô tả */
         .description-box { margin-bottom: 25px; border-left: 3px solid var(--primary-orange); padding-left: 15px; }
         .desc-heading { font-size: 16px; font-weight: 700; color: #444; margin-bottom: 8px; }
@@ -237,20 +258,162 @@
         .btn-modal-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(216, 43, 43, 0.4); }
         @media (max-width: 500px) { .modal-body { flex-direction: column; align-items: center; text-align: center; } .modal-actions { grid-template-columns: 1fr; } }
         /* --- CSS TOAST MESSAGE & LOADING (NÂNG CẤP) --- */
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-        .toast-msg { background: #fff; border-left: 5px solid #2ecc71; padding: 15px 20px; border-radius: 4px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; align-items: center; min-width: 300px; transform: translateX(100%); animation: slideInRight 0.5s forwards; transition: all 0.5s ease; }
-        .toast-msg.hide { transform: translateX(120%); opacity: 0; }
-        .toast-icon { font-size: 20px; color: #2ecc71; margin-right: 15px; }
-        .toast-body { flex: 1; color: #333; font-size: 14px; font-weight: 500; }
-        .toast-close { cursor: pointer; color: #999; font-size: 16px; transition: 0.3s; }
+        /* Toast & Modal */
+       /* --- TOAST & MODAL (ĐÃ SỬA LỖI MÀU & VỊ TRÍ) --- */
+        /* 1. Phần Thông Báo (Toast) */
+        #toast-box { position: fixed; top: 30px; right: 30px; z-index: 999999; /* Luôn nổi trên cùng */ display: flex; flex-direction: column; gap: 10px; }
+        .toast { width: 340px; background: #fff; font-weight: 500; box-shadow: 0 5px 20px rgba(0,0,0,0.15); display: flex; align-items: center; border-radius: 6px; border-left: 5px solid #4caf50; /* ĐÃ SỬA: Dùng mã màu trực tiếp thay vì biến var(--green) */ transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); padding: 16px 0; }
+        .toast.show { transform: translateX(0); }
+        .toast i.icon { margin: 0 15px; font-size: 22px; color: #4caf50; /* Màu xanh lá thành công */ }
+        .toast-msg { flex: 1; font-size: 14px; /* Tăng nhẹ cỡ chữ cho dễ đọc */ color: #333; line-height: 1.4; }
+        .toast-close { padding: 0 15px; cursor: pointer; color: #ccc; font-size: 18px; }
         .toast-close:hover { color: #333; }
-        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* 2. Phần Modal (Cửa sổ bật lên) */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); /* Nền tối mờ */ z-index: 2000; /* Cao hơn web nhưng thấp hơn Toast */ display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: 0.3s; padding: 15px; }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal-box { background: #fff; width: 600px; max-width: 100%; border-radius: 12px; overflow: hidden; transform: translateY(30px); transition: 0.4s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .modal-overlay.show .modal-box { transform: translateY(0); }
+        .modal-header { padding: 15px 25px; background: #ff6b35; /* ĐÃ SỬA: Đổi sang màu CAM (#ff6b35) để hợp với web của bạn */ color: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-weight: 800; font-size: 18px; text-transform: uppercase; }
+        .modal-close { cursor: pointer; font-size: 20px; transition: 0.2s; }
+        .modal-close:hover { transform: rotate(90deg); }
+        .modal-body { padding: 25px; font-size: 15px; line-height: 1.6; color: #444; }
         
         /* Hiệu ứng loading cho nút */
         .btn-loading { position: relative; pointer-events: none; opacity: 0.8; }
         .btn-loading span { visibility: hidden; }
         .btn-loading::after { content: ""; position: absolute; width: 20px; height: 20px; top: 50%; left: 50%; margin-top: -10px; margin-left: -10px; border: 3px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        /* --- CSS CHO PHẦN ĐÁNH GIÁ (Sắp xếp, Load more, Filter) --- */
+        #sort-control-container { display: flex; justify-content: flex-end; align-items: center; margin-right : 20px; padding: 10px 0; border-bottom: 1px dashed #eee; }
+        #sort-control-container label { font-size: 14px; color: #555; margin-right: 10px; font-weight: 600; }
+        #sort-select { padding: 6px 15px; border: 1px solid #ddd; border-radius: 20px; background-color: #fff; font-size: 14px; color: #333; cursor: pointer; outline: none; transition: all 0.2s ease; }
+        #sort-select:hover { border-color: #ffb400; }
+        #sort-select:focus { border-color: #ffb400; box-shadow: 0 0 5px rgba(255, 180, 0, 0.2); }
+        .load-more-container { text-align: center; margin-top: 30px; margin-bottom: 20px; clear: both; }
+        .load-more-container button { background-color: #fff; color: #333; border: 1px solid #ccc; padding: 10px 30px; font-size: 14px; font-weight: 600; border-radius: 30px; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .load-more-container button i { font-size: 12px; transition: transform 0.3s ease; }
+        .load-more-container button:hover { background-color: #ffb400; color: #fff; border-color: #ffb400; box-shadow: 0 4px 10px rgba(255, 180, 0, 0.3); }
+        .load-more-container button:hover i { transform: translateY(2px); }
+        .filter-btn.active { background-color: #ffb400 !important; color: #fff !important; border-color: #ffb400 !important; font-weight: bold; }
+        .user-review-list p { font-style: italic; background: #f9f9f9; border-radius: 8px; margin-top: 10px; padding: 15px; text-align: center; color: #999; }
+        /* --- CSS CHO PHẦN BỘ LỌC ĐÁNH GIÁ (FILTER) --- */
+        .filter-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; /* Tạo khoảng cách với phần điểm số */ }
+        .filter-btn { background: #fff; border: 1px solid #e0e0e0; /* Viền nhẹ cho trạng thái thường */ padding: 8px 18px; border-radius: 50px; /* Bo tròn kiểu viên thuốc */ cursor: pointer; font-size: 13px; color: #666; transition: all 0.3s ease; font-weight: 500; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .filter-btn:hover { background-color: #fff5e1; /* Màu nền be nhạt khi di chuột */ border-color: #ff6b35; color: #ff6b35; transform: translateY(-1px); }
+        .filter-btn.active { background: linear-gradient(90deg, #ff6b35, #d82b2b); /* Gradient màu thương hiệu */ border-color: transparent; color: #fff; box-shadow: 0 4px 10px rgba(216, 43, 43, 0.3); font-weight: 700; }
+
+        /* --- CSS CHO PHẦN SẮP XẾP (SORT) --- */
+        /* Container bao quanh do JS tạo ra */
+        #sort-control-container { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed #eee; gap: 10px; }
+        /* Label "Sắp xếp:" */
+        #sort-control-container label { font-weight: 600; color: #444; font-size: 14px; margin-right: 0 !important; /* Ghi đè style inline trong JS */ }
+        /* Dropdown Select */
+        #sort-select { padding: 8px 30px 8px 15px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; color: #333; outline: none; cursor: pointer; background-color: #fff; transition: all 0.3s ease; appearance: none; /* Ẩn mũi tên mặc định của trình duyệt */ -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23ff6b35%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 10px; min-width: 160px; }
+        #sort-select:hover { border-color: #ff6b35; background-color: #fffbf5; }
+        #sort-select:focus { border-color: #d82b2b; box-shadow: 0 0 0 3px rgba(216, 43, 43, 0.1); }
+
+        /* --- RESPONSIVE MOBILE --- */
+        @media (max-width: 768px) {
+            /* Đưa bộ lọc về giữa trên mobile */
+            .filter-group { justify-content: center; margin-top: 20px; }
+            /* Phần sắp xếp căn giữa và full width */
+            #sort-control-container { justify-content: space-between; /* Tách đều label và select */ background: #f9f9f9; padding: 10px 15px; border-radius: 8px; margin-top: 15px; }
+            #sort-select { min-width: auto; flex: 1; /* Dropdown tự giãn */ max-width: 200px; }
+        }
+        /*     ---------------------------------------- */
+        /* --- CSS CHO HỘP GỢI Ý MUA KÈM (RECOMMEND BOX) --- */
+        .suggest-box { position: fixed; bottom: 5px; /* chỉnh sửa từ 20px xuống 5px để sát đáy hơn */ right: 20px; width: 300px; background: #fff; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 1px solid #ff6b35; }
+        /* Trạng thái thu gọn */
+        .suggest-box.collapsed { transform: translateY(calc(100% - 45px)); /* Chỉ chừa lại thanh tiêu đề */ }
+        /* Tiêu đề */
+        .suggest-header { background: #ff6b35; color: #fff; padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 15px; }
+        .suggest-header:hover { background: #e85d2a; }
+        /* Danh sách sản phẩm */
+        .suggest-body { max-height: 300px; overflow-y: auto; background: #fff; }
+
+        /* --- PHẦN SỬA ĐỔI QUAN TRỌNG TỪ ĐÂY --- */
+
+        /* 1. Khung bao ngoài (Giữ flex để xếp hàng ngang) */
+        .suggest-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; transition: 0.2s; background: #fff; /* Đảm bảo nền trắng */ }
+        .suggest-item:hover { background-color: #fff5e1; /* Màu nền khi di chuột */ }
+
+        /* 2. Link sản phẩm (Chứa Ảnh + Tên + Giá) - MỚI */
+        /* Class này giúp bấm vào chữ hoặc ảnh thì chuyển trang */
+        .suggest-content-link { display: flex; /* Xếp ảnh và chữ nằm ngang */ align-items: center; /* Căn giữa dọc */ flex: 1; /* Chiếm hết khoảng trống để đẩy nút cộng sang phải */ text-decoration: none; /* Bỏ gạch chân */ color: #333; /* Màu chữ đen */ cursor: pointer; }
+        /* Ảnh sản phẩm (Nằm trong Link) */
+        .suggest-content-link img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; }
+        /* Thông tin chữ */
+        .suggest-info { flex: 1; }
+        .s-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+        .s-price { font-size: 13px; color: #d82b2b; font-weight: bold; }
+
+        /* 3. Nút Cộng (Thêm vào giỏ) - ĐÃ SỬA */
+        .s-btn { width: 30px; height: 30px; background: #ff6b35; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; /* Mới thêm: Để tạo cảm giác nút bấm */ margin-left: 10px; /* Cách ra khỏi phần chữ một chút */ transition: transform 0.2s; }
+        /* Hiệu ứng nhún khi bấm nút cộng */
+        .s-btn:active { transform: scale(0.9); }
+        .s-btn:hover { background: #e85d2a; /* Đậm hơn khi di chuột vào nút */ }
+
+        /* Hiệu ứng rung lắc + lửa (Giữ nguyên) */
+        @keyframes bellRingburn { 0% { transform: rotate(0); text-shadow: none; } 10% { transform: rotate(15deg); } 30% { transform: rotate(-15deg); } 50% { transform: rotate(10deg); color: #ff5722; text-shadow: 0 0 10px #ff9800; } 100% { transform: rotate(0); color: #e31e24; text-shadow: none; } }
+        .animate-fire { animation: bellRingburn 2s infinite ease-in-out; /* Chạy liên tục, mỗi nhịp 1.5 giây */ }
+        /* ------------------------------*/
+        /* ------------------------------*/
+        /* Promotionloader.js*/
+        /* ------------------------------*/
+        /* ------------------------------*/
+        /* --- CSS CHO CỤM ĐÁNH GIÁ & KHUYẾN MÃI --- */
+        .product-rating-overview { display: flex; align-items: center; justify-content: space-between; /* Đẩy 2 phần sang 2 bên hoặc dùng gap */ flex-wrap: wrap; gap: 15px; margin: 10px 0 20px 0; padding-bottom: 15px; border-bottom: 1px dashed #eee; }
+        .rating-group { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .rating-stars { color: #ffc107; }
+        .rating-number { font-weight: bold; color: var(--primary-orange); }
+        .scroll-link { text-decoration: underline; color: #555; cursor: pointer;}
+
+        /* Nút mở khuyến mãi */
+        .btn-open-promo { background-color: #ffeaea; color: var(--primary-red); border: 1px solid var(--primary-red); padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 5px; }
+        .btn-open-promo:hover { background-color: var(--primary-red); color: #fff; }
+        .btn-open-promo i { animation: tada 1.5s infinite; }
+
+        /* --- CSS CHO CỬA SỔ POPUP (MODAL) --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); /* Nền tối mờ */ z-index: 9999; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-box { background: #fff; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: translateY(20px); transition: all 0.3s; }
+        .modal-overlay.active .modal-box { transform: translateY(0); }
+        .modal-close-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #888; }
+        .modal-title { text-align: center; color: var(--primary-orange); margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+
+        /* CSS cho nội dung bên trong file promotion.html khi load vào */
+        .promo-item { display: flex; align-items: center; background: #fffbf5; border: 1px dashed var(--primary-orange); padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        .promo-icon { font-size: 24px; margin-right: 10px; }
+        .promo-text { flex: 1; }
+        .promo-text strong { color: var(--text-dark); display: block; }
+        .promo-text p { font-size: 12px; color: #666; margin: 0; }
+        .btn-copy { background: var(--primary-orange); color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+
+        /* Hiệu ứng rung nhẹ icon quà */
+        @keyframes tada { 0% { transform: scale(1); } 10%, 20% { transform: scale(0.9) rotate(-3deg); } 30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); } 40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); } 100% { transform: scale(1) rotate(0); } }
+        /* --- CSS CHO STICKY BAR --- */
+        /* --- CSS CHO STICKY BAR --- */
+        /* --- CSS CHO STICKY BAR --- */
+        /* --- CSS CHO STICKY BAR --- */
+        /* --- CSS CHO STICKY BAR --- */
+        .sticky-bar { position: fixed; top: 0; left: 0; width: 100%; background: #fff; padding: 10px 5%; /* Căn lề chuẩn */ box-shadow: 0 -4px 20px rgba(0,0,0,0.1); z-index: 1000; /* Luôn nổi lên trên cùng */ display: flex; justify-content: space-between; align-items: center; transform: translateY(-110%); /* Mặc định ẩn xuống dưới đáy */ transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        /* Class này được JS thêm vào để hiện thanh lên */
+        .sticky-bar.active { transform: translateY(0); }
+        .sticky-content { display: flex; align-items: center; gap: 15px; }
+        .sticky-img { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; border: 1px solid #eee; background: #f9f9f9; }
+        .sticky-info { display: flex; flex-direction: column; justify-content: center; }
+        .sticky-name { font-size: 14px; font-weight: 700; color: #333; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* Cắt chữ nếu quá dài */ text-transform: uppercase; }
+        .sticky-price { font-size: 14px; color: var(--primary-red, #d82b2b); /* Dùng màu đỏ chủ đạo của web */ font-weight: 700; }
+        .sticky-btn { background: linear-gradient(90deg, #ff6b35, #d82b2b); /* Màu cam đỏ */ color: #fff; border: none; padding: 10px 25px; border-radius: 30px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(216, 43, 43, 0.3); transition: all 0.2s; white-space: nowrap; }
+        .sticky-btn:hover { transform: scale(1.05); box-shadow: 0 6px 15px rgba(216, 43, 43, 0.4); }
+
+        /* Responsive: Trên màn hình điện thoại nhỏ thì ẩn tên đi cho đỡ chật */
+        @media (max-width: 480px) {
+            .sticky-name { display: none; } 
+            .sticky-bar { padding: 10px 15px; }
+        }
     </style>
 </head>
 <body>
@@ -287,6 +450,30 @@
                 <span class="stock-badge">Còn Hàng</span>
             </div>
 
+            <div class="product-rating-overview">
+                <div class="rating-group">
+                    <div class="rating-stars" id="header-stars">
+                        <i class="fa-solid fa-star"></i>
+                        <i class="fa-solid fa-star"></i>
+                        <i class="fa-solid fa-star"></i>
+                        <i class="fa-solid fa-star"></i>
+                        <i class="fa-solid fa-star"></i>
+                    </div>
+                    <span class="rating-number" id="header-rating-score">5.0</span>
+                    <span class="separator">|</span>
+                    <a href="#review-section" class="scroll-link" onclick="scrollToReviews(event)">
+                        Xem <span id="header-rating-count">0</span> đánh giá
+                    </a>
+                </div>
+
+                <div class="promo-btn-wrap">
+                    <button class="btn-open-promo" onclick="openPromoModal()">
+                        <i class="fa-solid fa-gift"></i> Săn Mã Giảm Giá
+                    </button>
+                </div>
+            </div>
+
+
             <div class="description-box">
                 <h3 class="desc-heading">Mô tả sản phẩm</h3>
                 <div class="desc-text">
@@ -322,8 +509,17 @@
 
             <button class="btn-buy-now">MUA HÀNG</button>
 
-            <div class="prod-stats">Có <strong>0</strong> lượt mua sản phẩm</div>
-            <div class="prod-stats">Có <strong>10</strong> lượt xem sản phẩm</div>
+            <div class="product-stats" style="margin: 10px 0; font-size: 14px; color: #666;">
+                <span>
+                    <div class="prod-stats">Có <span id="buy-count">0</span> lượt mua sản phẩm </div>  
+                </span>
+                            </br>
+                <span >
+                    <div class="prod-stats">Có <span id="view-count">0</span> lượt xem sản phẩm </div>   
+                </span>
+            </div>
+    
+        
             <div class="prod-note">
                 <i class="fa-solid fa-newspaper"></i>
                 <span>Website mới ra mắt – Số liệu hiển thị (lượt xem & lượt mua) sẽ được cập nhật liên tục.</span>
@@ -418,7 +614,7 @@
     </section>
 
 
-<section class="review-section container">
+<section class="review-section container" id="review-section">
     <h3 class="review-header">Đánh giá sản phẩm</h3>
     
     <div class="review-box-wrapper">
@@ -548,8 +744,8 @@
         </div>
         
         <div class="modal-body">
-            <div class="m-prod-img">
-                <img id="m-img" src="" alt="">
+            <div class="m-prod-img  main-image-frame" onclick="openZoom(this.querySelector('img').src)"> <!-- --- onlick goi funciion zoom anh --- -->
+                <img id="m-img"  src="" alt=""> 
             </div>
             <div class="m-prod-info">
                 <h4 id="m-name">Tên sản phẩm</h4>
@@ -574,7 +770,7 @@
         </div>
     </div>
 </div>
-
+<!-- --- zoom ảnh review  --- --- -->
 <div id="modal-image-overlay" class="modal-overlay" onclick="closeImageViewer()">
     <div class="modal-box" style="width: auto; max-width: 90%; background: transparent; box-shadow: none; padding: 0;">
         <button class="modal-close" onclick="closeImageViewer()" style="top: -30px; right: 0; color: #fff; font-size: 30px;">
@@ -583,26 +779,47 @@
         <img id="full-image-view" src="" alt="Ảnh chi tiết" style="max-width: 100%; max-height: 80vh; border-radius: 8px;">
     </div>
 </div>
+<!-- --- zoom ảnh sản phẩm  --- --- -->
+<div id="img-lightbox" class="lightbox-overlay" onclick="closeZoom()">
+    <img id="lightbox-src" class="lightbox-img" src="" alt="Zoom Image">
+</div>
+
+<!-- ---  STICKY BAR --- --- -->
+<div id="sticky-bar" class="sticky-bar">
+    <div class="sticky-content">
+        <img id="sticky-img" src="" alt="Sản phẩm" class="sticky-img">
+        <div class="sticky-info">
+            <div id="sticky-name" class="sticky-name">Đang tải...</div>
+            <div id="sticky-price" class="sticky-price">...</div>
+        </div>
+    </div>
+    <button class="sticky-btn" onclick="triggerMainBuy()">MUA NGAY</button>
+</div>
 <!-- --- CONTAINER THÔNG BÁO TOAST --- -->
 <div id="toast-container"></div>
+
+
+<!-- --- Chèn JS --- -->
+<script src="../js/header.js"></script>
+
+
+<script src="../js/product-detail/detail-actions.js"></script>
+<script src="../js/product-detail/fake-notification.js"></script>
+<script src="../js/product-detail/image-zoom.js"></script>
+<script src="../js/product-detail/popup-toast.js"></script>
+<script src="../js/product-detail/promotion-loader.js"></script>
+<script src="../js/product-detail/recommend.js"></script>
+<script src="../js/product-detail/review-outside.js"></script>
 <script src="../js/product-detail/review.js"></script>
+<script src="../js/product-detail/sticky.js"></script>
+
+
+<script src="../JS/widget-loader/widget-loader.js"></script>
+
+<!-- Swiper JS (Best Seller)-->
 <script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
 <script>
-    // Load header từ file header.html
-    fetch('header.html')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Không thể load header.html');
-            }
-            return response.text();
-        })
-        .then(data => {
-            document.getElementById('header-placeholder').innerHTML = data;
-        })
-        .catch(error => {
-            console.error('Lỗi khi load header:', error);
-        });
-
+    
     // --- Best Seller Slider (Đã chọn phiên bản đầy đủ nhất) ---
     var swiperBestSeller = new Swiper(".swiper-best-seller", {
         slidesPerView: 4, // Mặc định cho màn hình lớn
@@ -627,196 +844,7 @@
                 spaceBetween: 20
             },
         },
-    });
-    // Hàm chuyển đổi giữa Xem danh sách và Viết đánh giá
-    function toggleReviewForm(show) {
-        var listView = document.getElementById("review-list-view");
-        var formView = document.getElementById("review-form-view");
-
-        if (show) {
-            listView.style.display = "none";
-            formView.style.display = "block";
-        } else {
-            listView.style.display = "block";
-            formView.style.display = "none";
-        }
-    }
-
-    // Xử lý click chọn sao
-    const stars = document.querySelectorAll('.star-rating i');
-    stars.forEach((star, index) => {
-        star.addEventListener('click', () => {
-            // Reset hết
-            stars.forEach(s => s.classList.remove('active'));
-            // Active lại từ đầu đến vị trí click
-            for (let i = 0; i <= index; i++) {
-                stars[i].classList.add('active');
-            }
-        });
-    });
-    // --- JS XỬ LÝ POPUP MUA HÀNG ---
-    
-    // 1. Lấy nút Mua ngay và gán sự kiện click
-    const btnBuyNow = document.querySelector('.btn-buy-now');
-    if(btnBuyNow) {
-        btnBuyNow.addEventListener('click', function(e) {
-            e.preventDefault(); // Ngăn load lại trang
-            openCartModal();
-        });
-    }
-
-    // 2. Hàm mở Modal và lấy dữ liệu
-    function openCartModal() {
-        // Lấy thông tin từ giao diện
-        const imgSrc = document.querySelector('.main-image-frame img').src;
-        const prodName = document.querySelector('.pd-name').innerText;
-        const priceText = document.querySelector('.price-new').innerText; // Ví dụ: 35.000đ
-        const qty = parseInt(document.querySelector('.qty-input').value);
-        
-        // Lấy các thuộc tính (Size, Đường, Đá...) từ các thẻ select
-        let attributesHtml = '';
-        const selects = document.querySelectorAll('.custom-select');
-        selects.forEach(sel => {
-            const label = sel.parentElement.querySelector('.option-title').innerText;
-            const value = sel.options[sel.selectedIndex].text;
-            attributesHtml += `<span>${label}: <b>${value}</b></span>`;
-        });
-
-        // Tính tổng tiền (Xử lý chuỗi tiền tệ: bỏ chữ 'đ', bỏ dấu chấm)
-        const priceValue = parseInt(priceText.replace(/\./g, '').replace('đ', '')); 
-        const total = priceValue * qty;
-        const totalFormatted = total.toLocaleString('vi-VN') + 'đ';
-
-        // Điền dữ liệu vào Modal HTML
-        document.getElementById('m-img').src = imgSrc;
-        document.getElementById('m-name').innerText = prodName;
-        document.getElementById('m-attrs').innerHTML = attributesHtml; // Điền size, đường...
-        document.getElementById('m-qty').innerText = qty;
-        document.getElementById('m-total').innerText = totalFormatted;
-
-        // Hiển thị Modal
-        document.getElementById('modal-cart-overlay').classList.add('active');
-    }
-
-    // 3. Hàm đóng Modal
-    function closeModal() {
-        document.getElementById('modal-cart-overlay').classList.remove('active');
-    }
-
-    // Đóng khi click ra vùng mờ bên ngoài
-    document.getElementById('modal-cart-overlay').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeModal();
-        }
-    });
-
-    // --- JS NÂNG CẤP: TOAST & LOADING ---
-
-    // 1. Hàm tạo thông báo Toast xịn xò
-    function showToast(message, type = 'success') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        
-        // Icon và màu sắc dựa trên loại thông báo
-        let iconClass = 'fa-circle-check';
-        let color = '#2ecc71'; // Màu xanh lá mặc định
-        
-        if(type === 'error') { iconClass = 'fa-circle-exclamation'; color = '#e74c3c'; }
-        
-        toast.className = 'toast-msg';
-        toast.style.borderLeftColor = color;
-        toast.innerHTML = `
-            <i class="fa-solid ${iconClass} toast-icon" style="color: ${color}"></i>
-            <div class="toast-body">${message}</div>
-            <i class="fa-solid fa-xmark toast-close" onclick="this.parentElement.remove()"></i>
-        `;
-
-        container.appendChild(toast);
-
-        // Tự động ẩn sau 3 giây
-        setTimeout(() => {
-            toast.classList.add('hide');
-            setTimeout(() => toast.remove(), 500); // Xoá khỏi DOM sau khi ẩn
-        }, 3000);
-    }
-
-    // 2. Nâng cấp: Thêm vào giỏ hàng với thông báo Toast
-    function addToCartAction() {
-        // Đóng modal trước
-        closeModal(); 
-        
-        // Hiện thông báo đẹp thay vì alert
-        showToast("Đã thêm sản phẩm vào giỏ hàng thành công!");
-        
-        // Cập nhật số lượng trên icon giỏ hàng (giả lập)
-        // Ví dụ: updateCartCount(1);
-    }
-
-    // 3. Nâng cấp: Thanh toán với hiệu ứng Loading
-    function cartAction() {
-        const btnCheckout = document.querySelector('.btn-modal-primary');
-        
-        // Thêm class tạo hiệu ứng quay vòng
-        btnCheckout.classList.add('btn-loading');
-        // Giữ lại text cũ nhưng ẩn đi bằng CSS, chỉ hiện vòng quay
-        
-        // Giả lập độ trễ xử lý (2 giây)
-        setTimeout(() => {
-            // Chuyển trang
-            window.location.href = "cart.html";
-            
-            // (Tuỳ chọn) Nếu muốn reset nút sau khi xong (trường hợp AJAX)
-            // btnCheckout.classList.remove('btn-loading');
-        }, 2000);
-    }
-    // --- JS NÂNG CẤP REVIEW ---
-
-    // 1. Xem trước ảnh khi upload
-    const fileInput = document.getElementById('review-file-input');
-    const previewContainer = document.getElementById('preview-container');
-
-    if(fileInput) {
-        fileInput.addEventListener('change', function(e) {
-            previewContainer.innerHTML = ""; // Xóa ảnh cũ
-            const files = e.target.files;
-            
-            if (files && files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'preview-img';
-                    previewContainer.appendChild(img);
-                }
-                reader.readAsDataURL(files[0]);
-            }
-        });
-    }
-
-    // 2. Chức năng thả tim "Hữu ích"
-    function toggleLike(element) {
-        // Toggle class màu sắc
-        element.classList.toggle('liked');
-        
-        // Tìm thẻ icon và thẻ số lượng
-        const icon = element.querySelector('i');
-        const countSpan = element.querySelector('.like-count');
-        let count = parseInt(countSpan.innerText);
-
-        if (element.classList.contains('liked')) {
-            // Nếu vừa like: Đổi icon rỗng thành đặc, tăng số
-            icon.classList.remove('fa-regular');
-            icon.classList.add('fa-solid');
-            countSpan.innerText = count + 1;
-            showToast("Đã đánh giá hữu ích!", "success"); // Tận dụng Toast cũ
-        } else {
-            // Nếu bỏ like
-            icon.classList.remove('fa-solid');
-            icon.classList.add('fa-regular');
-            countSpan.innerText = count - 1;
-        }
-    }
-    
+    }); 
 </script>
 
 </body>
